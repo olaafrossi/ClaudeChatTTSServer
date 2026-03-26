@@ -6,8 +6,10 @@
 
 ```mermaid
 graph LR
-    A[Claude Code] --> B[MCP Server<br/>Node.js, local]
+    A[Claude Code] --> B[Local MCP Server<br/>Node.js stdio]
+    A --> B2[Remote MCP Server<br/>Next.js on Vercel]
     B --> C[App Service<br/>C#, Azure]
+    B2 --> C
     C --> D[Azure Speech SDK]
     C --> E[Azure Blob Storage]
     E --> F[SAS URL<br/>1hr expiry]
@@ -25,7 +27,10 @@ A C# ASP.NET Core minimal API running on **Azure App Service (F1 free tier)** th
 3. Uploads the MP3 to **Azure Blob Storage**
 4. Returns a time-limited SAS download URL
 
-A local **MCP server** (TypeScript) wraps the HTTP call so Claude Code can use it as a native tool (`mcp__tts__synthesize_speech`).
+Two MCP server options wrap the HTTP call so Claude Code can use it as a native tool (`mcp__tts__synthesize_speech`):
+
+- **Local** (`mcp-server/`) — stdio-based, runs on your machine alongside Claude Code
+- **Remote** (`mcp-remote/`) — HTTP-based Next.js app deployed to **Vercel**, accessible from anywhere with optional Bearer token auth
 
 ---
 
@@ -160,6 +165,53 @@ Claude will call `mcp__tts__synthesize_speech` and return a downloadable MP3 URL
 
 ---
 
+## Remote MCP Server (Vercel)
+
+A cloud-hosted alternative that requires no local setup — deploy once and connect from any machine.
+
+### 1. Deploy to Vercel
+
+```powershell
+cd C:\Dev\ClaudeChatTTSServer\mcp-remote
+npm install
+vercel deploy --prod
+```
+
+### 2. Configure Environment Variables
+
+In the Vercel dashboard (or via CLI), set:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TTS_ENDPOINT` | No | Defaults to `https://app-claudetts.azurewebsites.net/api/tts` |
+| `MCP_AUTH_TOKEN` | No | Bearer token for authentication. If unset, the server is open (dev only) |
+
+```powershell
+vercel env add TTS_ENDPOINT production
+vercel env add MCP_AUTH_TOKEN production
+```
+
+### 3. Connect in Claude Code
+
+Add the remote MCP server URL to your Claude Code settings. The MCP endpoint is at `/api/mcp` on your Vercel deployment:
+
+```
+https://your-project.vercel.app/api/mcp
+```
+
+If you configured `MCP_AUTH_TOKEN`, include it as a Bearer token in the Authorization header.
+
+### 4. Authentication
+
+The remote server supports optional Bearer token authentication:
+
+- **No `MCP_AUTH_TOKEN` set** — all requests are accepted (suitable for development)
+- **`MCP_AUTH_TOKEN` set** — requests must include `Authorization: Bearer <token>`
+
+Unauthorized requests receive a `401` response.
+
+---
+
 ## API Reference
 
 ### `POST /api/tts`
@@ -252,11 +304,18 @@ ClaudeChatTTSServer/
     ApiIntegrationTests.cs    # API endpoint integration tests (xUnit)
     TtsServiceTests.cs        # Format parsing unit tests
     ModelTests.cs             # Model default/property tests
-  mcp-server/
-    src/index.ts              # MCP tool wrapper (TypeScript)
+  mcp-server/                 # Local MCP server (stdio)
+    src/index.ts              # Stdio transport entry point
+    src/server.ts             # MCP server + tool registration
     src/synthesize.ts         # Extracted synthesis logic
     src/synthesize.test.ts    # Vitest tests
-    dist/index.js             # Built output (run npm run build)
+    dist/                     # Built output (run npm run build)
+  mcp-remote/                 # Remote MCP server (Vercel)
+    app/api/[transport]/
+      route.ts                # Next.js API route — MCP over HTTP
+    app/page.tsx              # Landing page
+    vercel.json               # Vercel deployment config
+    package.json
   .mcp.json                   # MCP config for Claude Code
   appsettings.json            # Local config (keys go in Azure app settings)
 ```
@@ -270,6 +329,7 @@ ClaudeChatTTSServer/
 | App Service | F1 (free) | $0/month |
 | Speech Services | F0 (free) | 500K chars/month free |
 | Blob Storage | Standard LRS | ~$0.02/GB/month |
+| Vercel | Hobby (free) | $0/month |
 
 For occasional Claude-driven TTS, total cost is effectively **$0/month**.
 
