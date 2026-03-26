@@ -1,4 +1,4 @@
-# ClaudeChatTTSServer
+# Claude Chat Text to Speech Server
 
 > **Azure Neural TTS as an MCP tool for Claude Code**
 >
