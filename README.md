@@ -7,7 +7,10 @@
 ```mermaid
 graph LR
     A[Claude Code] --> B[Local MCP Server<br/>Node.js stdio]
-    A --> B2[Remote MCP Server<br/>Next.js on Vercel]
+    A --> M[mcp-remote CLI]
+    M -->|Google OAuth| O[Google Sign-In]
+    M -->|Bearer token| B2[Remote MCP Server<br/>Next.js on Vercel]
+    B2 -->|tokeninfo| O
     B --> C[App Service<br/>C#, Azure]
     B2 --> C
     C --> D[Azure Speech SDK]
@@ -169,7 +172,7 @@ Claude will call `mcp__tts__synthesize_speech` and return a downloadable MP3 URL
 
 ## Remote MCP Server (Vercel)
 
-A cloud-hosted alternative that requires no local setup — deploy once and connect from any machine.
+A cloud-hosted alternative that requires no local setup — deploy once and connect from any machine. Uses **Google OAuth 2.0** to restrict access to a single authorized email.
 
 ### 1. Deploy to Vercel
 
@@ -186,31 +189,81 @@ In the Vercel dashboard (or via CLI), set:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `TTS_ENDPOINT` | **Yes** | URL of your C# TTS API (e.g. `https://your-app.azurewebsites.net/api/tts`) |
-| `MCP_AUTH_TOKEN` | No | Bearer token for authentication. If unset, the server is open (dev only) |
+| `ALLOWED_EMAIL` | No | Google email authorized to use the server. If unset, the server is open (dev only) |
 
 ```powershell
 vercel env add TTS_ENDPOINT production
-vercel env add MCP_AUTH_TOKEN production
+vercel env add ALLOWED_EMAIL production
 ```
 
 ### 3. Connect in Claude Code
 
-Add the remote MCP server URL to your Claude Code settings. The MCP endpoint is at `/api/mcp` on your Vercel deployment:
+Add the remote MCP server to your `.mcp.json` with your Google OAuth client credentials:
 
+```json
+{
+  "mcpServers": {
+    "tts": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://your-project.vercel.app/api/mcp",
+        "--oauth-client-id", "<YOUR_GOOGLE_CLIENT_ID>",
+        "--oauth-client-secret", "<YOUR_GOOGLE_CLIENT_SECRET>"
+      ]
+    }
+  }
+}
 ```
-https://your-project.vercel.app/api/mcp
+
+The `mcp-remote` CLI handles the OAuth browser flow automatically — it opens a Google sign-in page, exchanges the authorization code for an access token, and passes it as a Bearer token on every MCP request.
+
+### 4. OAuth Flow
+
+```mermaid
+sequenceDiagram
+    participant CC as Claude Code
+    participant MR as mcp-remote CLI
+    participant G as Google OAuth
+    participant V as Vercel MCP Server
+
+    CC->>MR: Start MCP session
+    MR->>V: GET /.well-known/oauth-protected-resource
+    V-->>MR: Auth server = accounts.google.com
+    MR->>G: Authorization request (browser)
+    G-->>MR: Access token
+    MR->>V: MCP request + Bearer token
+    V->>G: GET tokeninfo?access_token=...
+    G-->>V: {email, email_verified, scope}
+    V->>V: Verify email matches ALLOWED_EMAIL
+    V-->>MR: MCP response
+    MR-->>CC: Tool result
 ```
 
-If you configured `MCP_AUTH_TOKEN`, include it as a Bearer token in the Authorization header.
+**How it works:**
 
-### 4. Authentication
+1. **Discovery** — `mcp-remote` fetches `/.well-known/oauth-protected-resource` from the Vercel server, which advertises `https://accounts.google.com` as the authorization server
+2. **Browser login** — `mcp-remote` opens a Google sign-in page using the configured OAuth client ID/secret. The user signs in and grants access
+3. **Token relay** — `mcp-remote` attaches the Google access token as a `Bearer` token on every MCP request
+4. **Server-side verification** — the Vercel server validates the token against Google's `tokeninfo` endpoint and checks that the email is verified and matches `ALLOWED_EMAIL`
+5. **Access granted** — if the email matches, the request proceeds to the TTS tool; otherwise it returns `401 Unauthorized`
 
-The remote server supports optional Bearer token authentication:
+### 5. Authentication Modes
 
-- **No `MCP_AUTH_TOKEN` set** — all requests are accepted (suitable for development)
-- **`MCP_AUTH_TOKEN` set** — requests must include `Authorization: Bearer <token>`
+| Mode | Condition | Behavior |
+|------|-----------|----------|
+| **Open (dev)** | `ALLOWED_EMAIL` not set | All requests accepted, no token required |
+| **Google OAuth** | `ALLOWED_EMAIL` set | Bearer token required, email must match |
 
-Unauthorized requests receive a `401` response.
+### 6. Google OAuth Setup
+
+To create your own OAuth client credentials:
+
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create an **OAuth 2.0 Client ID** (type: Desktop app or Web application)
+3. Note the **Client ID** and **Client Secret**
+4. Add them to your `.mcp.json` as `--oauth-client-id` and `--oauth-client-secret`
+5. Set `ALLOWED_EMAIL` in Vercel to the Google account you'll sign in with
 
 ---
 
@@ -314,7 +367,10 @@ ClaudeChatTTSServer/
     dist/                     # Built output (run npm run build)
   mcp-remote/                 # Remote MCP server (Vercel)
     app/api/[transport]/
-      route.ts                # Next.js API route — MCP over HTTP
+      route.ts                # Next.js API route — MCP over HTTP + OAuth verification
+    app/.well-known/
+      oauth-protected-resource/
+        route.ts              # OAuth metadata — advertises Google as auth server
     app/page.tsx              # Landing page
     vercel.json               # Vercel deployment config
     package.json
