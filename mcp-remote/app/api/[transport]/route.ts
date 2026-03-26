@@ -1,4 +1,5 @@
-import { createMcpHandler } from "mcp-handler";
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 
 const TTS_ENDPOINT = process.env.TTS_ENDPOINT;
@@ -7,7 +8,7 @@ if (!TTS_ENDPOINT) {
   throw new Error("TTS_ENDPOINT environment variable is required");
 }
 
-const AUTH_TOKEN = process.env.MCP_AUTH_TOKEN;
+const ALLOWED_EMAIL = process.env.ALLOWED_EMAIL;
 
 async function synthesizeSpeech(
   params: { text: string; voice: string; format: string },
@@ -38,12 +39,50 @@ async function synthesizeSpeech(
   };
 }
 
-function verifyAuth(req: Request): boolean {
-  if (!AUTH_TOKEN) return true; // no token configured = open (dev only)
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader) return false;
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-  return token === AUTH_TOKEN;
+async function verifyToken(
+  _req: Request,
+  bearerToken?: string
+): Promise<AuthInfo | undefined> {
+  // No ALLOWED_EMAIL configured = open access (dev mode)
+  if (!ALLOWED_EMAIL) {
+    return {
+      token: "open",
+      scopes: [],
+      clientId: "anonymous",
+      extra: {},
+    };
+  }
+
+  if (!bearerToken) return undefined;
+
+  try {
+    // Validate the Google access token via Google's tokeninfo endpoint
+    const res = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(bearerToken)}`
+    );
+
+    if (!res.ok) return undefined;
+
+    const info = await res.json();
+
+    // Ensure the email is verified and matches the allowed email
+    if (!info.email_verified || info.email_verified === "false") {
+      return undefined;
+    }
+
+    if (info.email?.toLowerCase() !== ALLOWED_EMAIL.toLowerCase()) {
+      return undefined;
+    }
+
+    return {
+      token: bearerToken,
+      scopes: (info.scope ?? "").split(" ").filter(Boolean),
+      clientId: info.email,
+      extra: { email: info.email },
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 const mcpHandler = createMcpHandler(
@@ -77,14 +116,8 @@ const mcpHandler = createMcpHandler(
   { basePath: "/api", maxDuration: 60 }
 );
 
-async function handler(req: Request): Promise<Response> {
-  if (!verifyAuth(req)) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  return mcpHandler(req);
-}
+const handler = withMcpAuth(mcpHandler, verifyToken, {
+  required: !!ALLOWED_EMAIL,
+});
 
 export { handler as GET, handler as POST, handler as DELETE };
