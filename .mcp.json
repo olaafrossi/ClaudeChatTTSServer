@@ -4,7 +4,7 @@
       "command": "node",
       "args": ["C:\\Dev\\ClaudeChatTTSServer\\mcp-server\\dist\\index.js"],
       "env": {
-        "TTS_ENDPOINT": "http://localhost:7841/api/tts"
+        "TTS_ENDPOINT": "<your-tts-endpoint>"
       }
     }
   }

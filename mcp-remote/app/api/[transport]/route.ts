@@ -1,8 +1,11 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 
-const TTS_ENDPOINT =
-  process.env.TTS_ENDPOINT ?? "https://app-claudetts.azurewebsites.net/api/tts";
+const TTS_ENDPOINT = process.env.TTS_ENDPOINT;
+
+if (!TTS_ENDPOINT) {
+  throw new Error("TTS_ENDPOINT environment variable is required");
+}
 
 const AUTH_TOKEN = process.env.MCP_AUTH_TOKEN;
 

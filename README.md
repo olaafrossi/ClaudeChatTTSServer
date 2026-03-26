@@ -123,10 +123,10 @@ az webapp deploy --name $APP_NAME --resource-group $RG --src-path ./deploy.zip -
 
 ```powershell
 # Health check
-Invoke-WebRequest -Uri "https://app-claudetts.azurewebsites.net/"
+Invoke-WebRequest -Uri "https://$APP_NAME.azurewebsites.net/"
 
 # Synthesize speech
-Invoke-WebRequest -Uri "https://app-claudetts.azurewebsites.net/api/tts" -Method POST -ContentType "application/json" -Body '{"text":"Hello, this is a test."}'
+Invoke-WebRequest -Uri "https://$APP_NAME.azurewebsites.net/api/tts" -Method POST -ContentType "application/json" -Body '{"text":"Hello, this is a test."}'
 ```
 
 ---
@@ -150,6 +150,8 @@ Copy-Item C:\Dev\ClaudeChatTTSServer\.mcp.json C:\Users\<YOUR_USERNAME>\.mcp.jso
 ```
 
 Or to `~/.claude/.mcp.json` if the home root doesn't work.
+
+> **Important:** Edit `.mcp.json` and set `TTS_ENDPOINT` to your Azure App Service URL (e.g. `https://your-app.azurewebsites.net/api/tts` or `http://localhost:7841/api/tts` for local development). The MCP server will not start without it.
 
 ### 3. Restart Claude Code
 
@@ -183,7 +185,7 @@ In the Vercel dashboard (or via CLI), set:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `TTS_ENDPOINT` | No | Defaults to `https://app-claudetts.azurewebsites.net/api/tts` |
+| `TTS_ENDPOINT` | **Yes** | URL of your C# TTS API (e.g. `https://your-app.azurewebsites.net/api/tts`) |
 | `MCP_AUTH_TOKEN` | No | Bearer token for authentication. If unset, the server is open (dev only) |
 
 ```powershell
