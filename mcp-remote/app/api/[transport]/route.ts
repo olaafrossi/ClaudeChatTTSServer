@@ -53,7 +53,7 @@ const mcpHandler = createMcpHandler(
         voice: z
           .string()
           .optional()
-          .default("en-US-AriaNeural")
+          .default("en-GB-SoniaNeural")
           .describe(
             "Azure Neural TTS voice name, e.g. en-US-AriaNeural, en-US-GuyNeural, en-GB-SoniaNeural"
           ),
