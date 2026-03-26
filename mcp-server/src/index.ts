@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { synthesizeSpeech } from "./synthesize.js";
 
 const TTS_ENDPOINT =
   process.env.TTS_ENDPOINT ?? "http://localhost:7841/api/tts";
@@ -31,35 +32,7 @@ server.tool(
       ),
   },
   async ({ text, voice, format }) => {
-    const response = await fetch(TTS_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, voice, format }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `TTS synthesis failed (${response.status}): ${error}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    const result = await response.json();
-
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
+    return synthesizeSpeech({ text, voice, format }, TTS_ENDPOINT);
   }
 );
 

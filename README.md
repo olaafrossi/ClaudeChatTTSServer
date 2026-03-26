@@ -216,6 +216,27 @@ Health check. Returns `{"status":"healthy","service":"ClaudeChatTTSServer"}`.
 
 ---
 
+## Running Tests
+
+### C# (xUnit)
+
+```powershell
+dotnet test
+```
+
+Runs 21 tests covering API endpoint validation, service error handling, format parsing, and model defaults. Uses `WebApplicationFactory` with mocked dependencies — no Azure credentials needed.
+
+### TypeScript (Vitest)
+
+```powershell
+cd mcp-server
+npm test
+```
+
+Runs 8 tests covering the `synthesizeSpeech` function: request formatting, success/error responses, default parameters, and network error handling.
+
+---
+
 ## Project Structure
 
 ```
@@ -225,9 +246,16 @@ ClaudeChatTTSServer/
     TtsRequest.cs             # Input model
     TtsResponse.cs            # Output model
   Services/
+    ITtsService.cs            # Service interface
     TtsService.cs             # Speech synthesis + blob upload
+  ClaudeChatTTSServer.Tests/
+    ApiIntegrationTests.cs    # API endpoint integration tests (xUnit)
+    TtsServiceTests.cs        # Format parsing unit tests
+    ModelTests.cs             # Model default/property tests
   mcp-server/
     src/index.ts              # MCP tool wrapper (TypeScript)
+    src/synthesize.ts         # Extracted synthesis logic
+    src/synthesize.test.ts    # Vitest tests
     dist/index.js             # Built output (run npm run build)
   .mcp.json                   # MCP config for Claude Code
   appsettings.json            # Local config (keys go in Azure app settings)

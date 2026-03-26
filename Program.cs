@@ -20,11 +20,11 @@ public class Program
 
         builder.Services.AddSingleton(_ => SpeechConfig.FromSubscription(speechKey, speechRegion));
         builder.Services.AddSingleton(_ => new BlobServiceClient(storageConn));
-        builder.Services.AddSingleton<TtsService>();
+        builder.Services.AddSingleton<ITtsService, TtsService>();
 
         var app = builder.Build();
 
-        app.MapPost("/api/tts", async (TtsRequest request, TtsService tts) =>
+        app.MapPost("/api/tts", async (TtsRequest request, ITtsService tts) =>
         {
             if (string.IsNullOrWhiteSpace(request.Text))
                 return Results.BadRequest(new { error = "\"text\" field is required and cannot be empty" });

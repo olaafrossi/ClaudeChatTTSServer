@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="ClaudeChatTTSServer.csproj" />
+  <Project Path="ClaudeChatTTSServer.Tests/ClaudeChatTTSServer.Tests.csproj" />
 </Solution>

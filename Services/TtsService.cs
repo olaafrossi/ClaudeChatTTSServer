@@ -6,7 +6,7 @@ using Microsoft.CognitiveServices.Speech;
 
 namespace ClaudeChatTTSServer.Services;
 
-public sealed class TtsService
+public sealed class TtsService : ITtsService
 {
     private const string ContainerName = "tts-audio";
 
