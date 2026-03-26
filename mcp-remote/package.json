@@ -1,5 +1,5 @@
 {
-  "name": "claude-tts-mcp-remote",
+  "name": "claude_tts_mcp_remote",
   "version": "1.0.0",
   "private": true,
   "scripts": {
