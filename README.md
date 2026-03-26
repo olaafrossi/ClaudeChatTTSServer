@@ -4,13 +4,14 @@
 >
 > Send text &rarr; get back a downloadable MP3 URL in seconds.
 
-```
-Claude Code ──► MCP Server (Node.js, local) ──► App Service (C#, Azure) ──► Azure Speech SDK
-                                                        │
-                                                        ├──► Azure Blob Storage
-                                                        │       └── SAS URL (1hr expiry)
-                                                        │
-                                                        └──► Returns { url, duration, voice }
+```mermaid
+graph LR
+    A[Claude Code] --> B[MCP Server<br/>Node.js, local]
+    B --> C[App Service<br/>C#, Azure]
+    C --> D[Azure Speech SDK]
+    C --> E[Azure Blob Storage]
+    E --> F[SAS URL<br/>1hr expiry]
+    C --> G[Returns<br/>url, duration, voice]
 ```
 
 ---
